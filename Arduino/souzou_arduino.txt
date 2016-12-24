@@ -257,6 +257,7 @@ void DoneRotate () {
 
 void DoneMove () {
   Serial.write((byte)(131)); //130 131
+}
 
 void Out (String s) {
   if (waitingStSignal <= 0) {

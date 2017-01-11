@@ -1,0 +1,61 @@
+<HTML>
+<pre>
+Engine class: contains core functions for game.
+include "Engine.h"
+
+
+Static functions
+
+<b>
+static void BeginStencil(float x, float y, float w, float h);</b>
+Specifies a rectangle where subsequent drawing calls are drawn into.
+<b>
+static void EndStencil();</b>
+Clears the stencil. Subsequent drawing calls are drawn full-screen.
+<b>	
+static void DrawTexture(float x, float y, float w, float h, Texture* texture);
+static void DrawTexture(float x, float y, float w, float h, Texture* texture, float alpha);
+static void DrawTexture(float x, float y, float w, float h, Texture* texture, Color tint);</b>
+Draws a texture to the screen, optionally with alpha or tint. Resulting texture drawn is multiplied with alpha/tint.
+<b>
+static void DrawLine(Vec2 v1, Vec2 v2, Color col, float width);
+static void DrawLine(Vec3 v1, Vec3 v2, Color col, float width);</b>
+Draws a line with color and width. The line is drawn in world space.
+<b>
+static void DrawLineW(Vec3 v1, Vec3 v2, Color col, float width);</b>
+Draws a line with color and width. The line is drawn in screen space.
+<b>
+static void Label(float x, float y, float s, string str, Font* font);
+static void Label(float x, float y, float s, string str, Font* font, Color color);
+static void Label(float x, float y, float s, string str, Font* font, Color color, float maxw);</b>
+Draws a line of text str on screen, with size s, using specified font. If optional maxw is specified, the line will be trimmed to be shorter then maxw in pixels.
+Example: abcdefghijklmn -> abcdefgh.. 
+<b>
+static byte Button(float x, float y, float w, float h);
+static byte Button(float x, float y, float w, float h, Color normalColor);
+static byte Button(float x, float y, float w, float h, Color normalColor, string label, float labelSize, Font* labelFont, Color labelColor);
+static byte Button(float x, float y, float w, float h, Color normalColor, Color highlightColor, Color pressColor);
+static byte Button(float x, float y, float w, float h, Texture* texture, Color normalColor, Color highlightColor, Color pressColor);
+static byte Button(float x, float y, float w, float h, Color normalColor, Color highlightColor, Color pressColor, string label, float labelSize, Font* labelFont, Color labelColor);</b>
+Draws a button with color/texture accepting mouse input. Return value can be queried as below.
+<i>MOUSE_DOWN</i> mouse is pressed
+<i>MOUSE_HOLD</i> mouse is pressed (every frame)
+<i>MOUSE_UP</i> mouse is lifted
+<i>MOUSE_HOVER_FLAG</i> is set when mouse is above the button. Use <i>MOUSE_PRESS</i> and <i>MOUSE_RELEASE</i> for normal button interactions.
+Example: if (Button(10, 10, 40, 15, blue()) == MOUSE_PRESS) { Debug.Write("hi!") }
+<b>
+static byte EButton(bool a, float x, float y, float w, float h, Color normalColor);
+static byte EButton(bool a, float x, float y, float w, float h, Color normalColor, Color highlightColor, Color pressColor);
+static byte EButton(bool a, float x, float y, float w, float h, Color normalColor, string label, float labelSize, Font* labelFont, Color labelColor);
+static byte EButton(bool a, float x, float y, float w, float h, Texture* texture, Color color);
+static byte EButton(bool a, float x, float y, float w, float h, Texture* texture, Color normalColor, Color highlightColor, Color pressColor);
+static byte EButton(bool a, float x, float y, float w, float h, Color normalColor, Color highlightColor, Color pressColor, string label, float labelSize, Font* labelFont, Color labelColor);</b>
+Draws a button only if a is true, or else draws a texture ignoring user input. May reduce cpu overhead.
+<b>
+static bool DrawToggle(float x, float y, float s, Color col, bool t);
+static bool DrawToggle(float x, float y, float s, Texture* texture, bool t);
+static bool DrawToggle(float x, float y, float s, Texture* texture, Color col, bool t);</b>
+Draws a toggle button passing a parameter t as whether the button is active. Returns t, inverting it when user presses the button.
+Example: useFoo = DrawToggle(10, 10, 14, white(), useFoo);
+</pre>
+</HTML>

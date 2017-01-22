@@ -7,7 +7,7 @@
 <p>  Now after a few nights I figured the only way to do this would be the manual way: generate script resolvers. Headers would be serialized as indexes, and <code>GetComponent()</code> would call <code>map[index]</code>, returning the SceneScript as shown below. Note that for a script to be attacheable on objects, they should extend the SceneScript class, which implements core classes like <code>Start()</code> and <code>Update()</code>. The header is as follows:</p>
 <pre><code class="language-cpp"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unordered_map&gt;</span></span>
 <span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">"Engine.h"</span></span>
-<span class="hljs-function"><span class="hljs-keyword">typedef</span> <span class="hljs-title">SceneScript</span><span class="hljs-params">(*sceneScriptInstantiator)</span><span class="hljs-params">()</span></span>;
+<span class="hljs-keyword">typedef</span> SceneScript*(*sceneScriptInstantiator)();
 <span class="hljs-keyword">class</span> SceneScriptResolver {
 <span class="hljs-keyword">public</span>:
     SceneScriptResolver();
@@ -19,10 +19,10 @@
 <span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">"Engine.h"</span></span>
 
 <span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">"boo.h"</span></span>
-Boo _Inst0() { <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Boo(); }
+Boo* _Inst0() { <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Boo(); }
 
 <span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">"foo.h"</span></span>
-Foo _Inst1() { <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Foo(); }
+Foo* _Inst1() { <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> Foo(); }
 
 <span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> <span class="hljs-built_in">std</span>;
 
@@ -34,60 +34,59 @@ SceneScriptResolver::SceneScriptResolver() {
 <p>  Now all we need to do is to include all those scripts in the vcxproj file, and that is simple enough so I would leave it there. (Actually I haven’t done it yet XD)</p>
 <h2><a id="Actual_compiling_Msbuild_45"></a><em>Actual</em> compiling (Msbuild)</h2>
 <p>  Now to build the game, calling Msbuild would be necessary. The problem is that we want to show the build progress in the engine window, and block all editing until it finishes (or fails). Calling <code>CreateProcess()</code> with redirected stdio did the trick, but as Msbuild won’t shut down after it compiles, manual parsing it’s output messages was done to check it’s status. The actual code for <code>DoMsBuild()</code> is shown below. Unimportant lines are omitted with <code>//..</code> and error handling removed.</p>
-<pre><code class="language-cpp">LPDWORD word;
-char s[255];
-DWORD i = 255;
-if (RegGetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\MSBuild\\ToolsVersions\\4.0",
- "MSBuildToolsPath", RRF_RT_ANY, nullptr, &amp;s, &amp;i) == ERROR_SUCCESS) {
-    SECURITY_ATTRIBUTES sa;
-    //..
-    HANDLE stdOutR, stdOutW;
-    CreatePipe(&amp;stdOutR, &amp;stdOutW, &amp;sa, 0);
-    SetHandleInformation(stdOutR, HANDLE_FLAG_INHERIT, 0);
-    STARTUPINFO startInfo;
-    //..
-    string ss = (string(s) + "\\msbuild.exe");
+<pre><code class="language-cpp">    LPDWORD word;
+    char s[255];
+    DWORD i = 255;
+    if (RegGetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\MSBuild\\ToolsVersions\\4.0",
+     "MSBuildToolsPath", RRF_RT_ANY, nullptr, &amp;s, &amp;i) == ERROR_SUCCESS) {
+        SECURITY_ATTRIBUTES sa;
+        //..
+        HANDLE stdOutR, stdOutW;
+        CreatePipe(&amp;stdOutR, &amp;stdOutW, &amp;sa, 0);
+        SetHandleInformation(stdOutR, HANDLE_FLAG_INHERIT, 0);
+        STARTUPINFO startInfo;
+        //..
+        string ss = (string(s) + "\\msbuild.exe");
+
         bool failed = true;
-    byte FINISH = 0;
-    //actually building the game. Project file hardcoded for testing. Note that currentDirectory is set
-    //to project folder to prevent msbuild using the engine's sln project files.
-    if (CreateProcess(ss.c_str(), "F:\\TestProject\\TestProject.vcxproj /nr:false /t:Build
-     /p:Configuration=Release /v:n /nologo /fl /flp:LogFile=F:\\TestProject\\BuildLog.txt",
-     NULL, NULL, true, 0, NULL, "F:\\TestProject\\", &amp;startInfo, &amp;processInfo) != 0) {
-        DWORD w;
-        do {
-            //read messages in loop to prevent hogging
-            w = WaitForSingleObject(processInfo.hProcess, 0.5f);
-            //..
-            if (bSuccess &amp;&amp; dwRead &gt; 0) {
-                string s(chBuf, dwRead);
-                out += s;
-            }
-            //basically string.split
-            for (int r = 0; r &lt; out.size();) {
-                int rr = out.find_first_of('\n', r);
-                if (rr == string::npos)
-                    rr = out.size() - 1;
-                string sss = out.substr(r, rr - r);
-                e-&gt;AddBuildLog(e, sss);
-                //if one of the following lines appear, build has finished.
-                if (sss.substr(0, 16) == "Build succeeded.") {
-                    failed = false;
-                    FINISH = 1;
+        byte FINISH = 0;
+        //actually building the game. Project file hardcoded for testing. Note that currentDirectory is set
+        //to project folder to prevent msbuild using the engine's sln project files.
+        if (CreateProcess(ss.c_str(), "F:\\TestProject\\TestProject.vcxproj /nr:false /t:Build
+         /p:Configuration=Release /v:n /nologo /fl /flp:LogFile=F:\\TestProject\\BuildLog.txt",
+         NULL, NULL, true, 0, NULL, "F:\\TestProject\\", &amp;startInfo, &amp;processInfo) != 0) {
+            DWORD w;
+            do {
+                //read messages in loop to prevent hogging
+                w = WaitForSingleObject(processInfo.hProcess, 0.5f);
+                //..
+                if (bSuccess &amp;&amp; dwRead &gt; 0) {
+                    string s(chBuf, dwRead);
+                    out += s;
                 }
-                else if (sss.substr(0, 12) == "Build FAILED") {
-                    FINISH = 1;
+                //basically string.split
+                for (int r = 0; r &lt; out.size();) {
+                    int rr = out.find_first_of('\n', r);
+                    if (rr == string::npos)
+                        rr = out.size() - 1;
+                    string sss = out.substr(r, rr - r);
+                    e-&gt;AddBuildLog(e, sss);
+                    //if one of the following lines appear, build has finished.
+                    if (sss.substr(0, 16) == "Build succeeded.") {
+                        failed = false;
+                        FINISH = 1;
+                    }
+                    else if (sss.substr(0, 12) == "Build FAILED") {
+                        FINISH = 1;
+                    }
+                    r = rr + 1;
                 }
-                r = rr + 1;
-            }
-            if (FINISH == 1 &amp;&amp; e-&gt;buildLog[e-&gt;buildLog.size() - 1].substr(0, 13) == "Time Elapsed ")
-                FINISH = 2;
-        } while (w == WAIT_TIMEOUT &amp;&amp; FINISH != 2);
-        return (!failed);
-    }
-    //..
-}
-//..
+                if (FINISH == 1 &amp;&amp; e-&gt;buildLog[e-&gt;buildLog.size() - 1].substr(0, 13) == "Time Elapsed ")
+                    FINISH = 2;
+            } while (w == WAIT_TIMEOUT &amp;&amp; FINISH != 2);
+            return (!failed);
+        }
+        //..
 </code></pre>
 <p>The output looks something like this:<br>
 <img src="images/0121_build0.png" alt=""></p>

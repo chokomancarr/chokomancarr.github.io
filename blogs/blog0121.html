@@ -9,7 +9,7 @@
 <h2>Script compiling</h2>
 <p>  So to allow users to add their own code, and allowing SceneObjects to call CreateComponent() with the correct script instance, some form of script serialization should be in order. Now C++ does not support native string-to-class conversions, so saving a list of headers in xml or similar format would be useless.</p>
 <p>  Now after a few nights I figured the only way to do this would be the manual way: generate script resolvers. Headers would be serialized as indexes, and <code>GetComponent()</code> would call <code>map[index]</code>, returning the SceneScript as shown below. Note that for a script to be attacheable on objects, they should extend the SceneScript class, which implements core classes like <code>Start()</code> and <code>Update()</code>. The header is as follows:</p>
-<pre><code class="cpp">#include &lt;unordered_map&gt;
+<pre><code class="language-cpp">#include &lt;unordered_map&gt;
 #include &quot;Engine.h&quot;
 typedef SceneScript*(*sceneScriptInstantiator)();
 class SceneScriptResolver {
@@ -19,7 +19,7 @@ public:
 };
 </code></pre>
 <p>... and the following generated on compile time (of the game, not the engine):</p>
-<pre><code class="cpp">#include &quot;SceneScriptResolver.h&quot;
+<pre><code class="language-cpp">#include &quot;SceneScriptResolver.h&quot;
 #include &quot;Engine.h&quot;
 
 #include &quot;boo.h&quot;
@@ -38,7 +38,7 @@ SceneScriptResolver::SceneScriptResolver() {
 <p>  Now all we need to do is to include all those scripts in the vcxproj file, and that is simple enough so I would leave it there. (Actually I haven't done it yet XD)</p>
 <h2><em>Actual</em> compiling (Msbuild)</h2>
 <p>  Now to build the game, calling Msbuild would be necessary. The problem is that we want to show the build progress in the engine window, and block all editing until it finishes (or fails). Calling <code>CreateProcess()</code> with redirected stdio did the trick, but as Msbuild won't shut down after it compiles, manual parsing it's output messages was done to check it's status. The actual code for <code>DoMsBuild()</code> is shown below. Unimportant lines are omitted with <code>//..</code> and error handling removed.</p>
-<pre><code class="cpp">    LPDWORD word;
+<pre><code class="language-cpp">    LPDWORD word;
     char s[255];
     DWORD i = 255;
     if (RegGetValue(HKEY_LOCAL_MACHINE, &quot;SOFTWARE\\Microsoft\\MSBuild\\ToolsVersions\\4.0&quot;,

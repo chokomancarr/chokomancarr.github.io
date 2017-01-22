@@ -4,6 +4,6 @@
     "version": "0.1.0",
     "command": "markdown-it",
     "isShellCommand": true,
-    "args": ["blogs/enginediary0121.md", "-o", "blogs/enginediary0121.html", ""],
+    "args": ["blogs/blog0121.md", "-o", "blogs/blog0121.html", ""],
     "showOutput": "always"
 }

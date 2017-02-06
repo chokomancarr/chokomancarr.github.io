@@ -1,0 +1,263 @@
+<html>
+<head>
+	<h1>Engine Diaries #2</h1>
+	<link href="https:/puakai.github.io/prism.css" rel="stylesheet" />
+</head>
+<body>
+<p><a href="blog0121.html">previous article</a></p>
+<p><a href="https://github.com/puakai/OpenGl_Engine">Source on Github</a></p>
+<p>There goes my second year. Sigh. Hope i didn't fail any subjects lol not funny</p>
+<h2>Importing models</h2>
+<p>First thing first, exporting a readable format from Blender. <em>obj?? fbx?? Why not use them??</em> Well, the same reason I am trying to write this engine this whole time. Gonna stop explaining that, ok?
+Exporting itself is pretty straightforward. Read all meshes' transformations and mesh data, and write to respective files. Something like this:</p>
+<pre><code class="language-python">def execute(self):
+    pos0 = self.arg.index(&quot;?&quot;)
+    dirr = self.arg[:pos0]
+    print (dirr)
+    if os.access(dirr, os.W_OK) is False:
+        print(&quot;!permission denied : &quot; + dirr)
+        return False
+    name = self.arg[(pos0+1):]
+    print(name)
+    #self.path = os.path.join(dirr, name)
+    print (&quot;!writing to: &quot; + dirr + name + &quot;.blend.meta&quot;)
+
+    #write mesh list to main .meta
+    file2 = open(dirr + name + &quot;.blend.meta&quot;, &quot;wb&quot;)
+    self.write(file2, &quot;KTM123\n&quot;)
+    for obj in self.scene.objects:
+        if obj.type != 'MESH':
+            continue
+        print (&quot;obj &quot; + obj.name)
+        self.write(file2, &quot;obj &quot; + obj.name)
+        if obj.parent:
+            self.write(file2, &quot; \x00prt &quot; + obj.parent.name)
+        poss = obj.location
+        self.write(file2, &quot; \x00pos {:f} {:f} {:f}&quot;.format(poss[0], poss[1], poss[2]))
+        rott = obj.rotation_quaternion
+        self.write(file2, &quot; \x00rot {:f} {:f} {:f} {:f}&quot;.format(rott[0], rott[1], rott[2], rott[3]))
+        scll = obj.scale
+        self.write(file2, &quot; \x00scl {:f} {:f} {:f}\n&quot;.format(scll[0], scll[1], scll[2]))
+
+        print (&quot;!writing to: &quot; + dirr + name + &quot;_blend\\&quot; + obj.name + &quot;.mesh.meta&quot;)
+        file = open(dirr + name + &quot;_blend\\&quot; + obj.name + &quot;.mesh.meta&quot;, &quot;wb&quot;)
+        self.write(file, &quot;KTO123\r\n&quot;)
+
+        self.write(file, &quot;  obj &quot; + obj.name + &quot; [\r\n&quot;)
+        obj.modifiers.new(&quot;tria&quot;, 'TRIANGULATE')
+        m = obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
+        for loop in m.loops:
+            vert = m.vertices[loop.vertex_index]
+            self.write(file, &quot;    vrt {} {:f} {:f} {:f}\r\n&quot;.format(loop.index, vert.co[0], vert.co[1], vert.co[2]))
+            self.write(file, &quot;    nrm {} {:f} {:f} {:f}\r\n&quot;.format(loop.index, vert.normal[0], vert.normal[1], vert.normal[2]))
+        self.write(file, &quot;\r\n&quot;)
+        for poly in m.polygons:
+            self.write(file, &quot;    tri {} &quot;.format(poly.material_index))
+            for loop_index in poly.loop_indices:
+                self.write(file, &quot; {}&quot;.format(loop_index))
+            self.write(file, &quot;\r\n&quot;)
+        self.write(file, &quot;\r\n&quot;)
+        if len(m.uv_layers) &gt; 0:
+            i = 0
+            for uvl in m.uv_layers[0].data:
+                self.write(file, &quot;    uv0 {} {} {} \r\n&quot;.format(i, uvl.uv[0], uvl.uv[1]))
+                i = i+1
+        #if obj.type == 'MESH' and m.shape_keys:
+        #    for block in m.shape_keys.key_blocks:
+        #        self.write(file, &quot;    shp &quot; + block.name + &quot;\r\n&quot;)
+        self.write(file, &quot;\r\n  ]\r\n&quot;)
+        file.close()
+    file2.close()
+
+def write (self, file, _str):
+    file.write(_str.encode())
+</code></pre>
+<p>Note that the file path is passed as command line argument when invoking this script. Also, the file contents are incomplete. Just gonna add them as I go on.</p>
+<p>Now the invoking part is the hard part. Originally, I would just call CreateProcess with args and get done with it, but <em>I need it to print a debug log to, if possible, the engine output window</em>. So the obvious thing is to redirect stdio and do print() in Python, but <strong>Blender will crash when its stdio is redirected</strong>. Fk.</p>
+<p>Now for the dirty part. To read io and not kill Blender in the process, Blender is invoked separately by creating a command prompt, redirecting that window's stdio, and invoking Blender <em>manually</em> by command lines. Yeah.</p>
+<pre><code class="language-csharp">SECURITY_ATTRIBUTES sa;
+sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+sa.bInheritHandle = TRUE;
+sa.lpSecurityDescriptor = NULL;
+HANDLE stdOutR, stdOutW, stdInR, stdInW;
+if (!CreatePipe(&amp;stdInR, &amp;stdInW, &amp;sa, 0)) {
+    cout &lt;&lt; &quot;failed to create pipe for stdin!&quot;;
+    return false;
+}
+if (!SetHandleInformation(stdInW, HANDLE_FLAG_INHERIT, 0)){
+    cout &lt;&lt; &quot;failed to set handle for stdin!&quot;;
+    return false;
+}
+if (!CreatePipe(&amp;stdOutR, &amp;stdOutW, &amp;sa, 0)) {
+    cout &lt;&lt; &quot;failed to create pipe for stdout!&quot;;
+    return false;
+}
+if (!SetHandleInformation(stdOutR, HANDLE_FLAG_INHERIT, 0)){
+    cout &lt;&lt; &quot;failed to set handle for stdout!&quot;;
+    return false;
+}
+STARTUPINFO startInfo;
+PROCESS_INFORMATION processInfo;
+ZeroMemory(&amp;startInfo, sizeof(STARTUPINFO));
+ZeroMemory(&amp;processInfo, sizeof(PROCESS_INFORMATION));
+startInfo.cb = sizeof(STARTUPINFO);
+startInfo.hStdInput = stdInR;
+startInfo.hStdOutput = stdOutW;
+startInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+//create meta directory
+string ss = s.substr(0, s.find_last_of('.'));
+string sss = ss + &quot;_blend&quot;;
+if (!CreateDirectory(sss.c_str(), NULL)) {
+    for (string file : IO::GetFiles(sss))
+        DeleteFile(file.c_str());
+}
+SetFileAttributes(sss.c_str(), FILE_ATTRIBUTE_HIDDEN);
+string ms(s + &quot;.meta&quot;);
+DeleteFile(ms.c_str());
+
+bool failed = true;
+string cmd1(e-&gt;_blenderInstallationPath.substr(0, 2) + &quot;\n&quot;); //root
+string cmd2(&quot;cd &quot; + e-&gt;_blenderInstallationPath.substr(0, e-&gt;_blenderInstallationPath.find_last_of(&quot;\\&quot;)) + &quot;\n&quot;);
+string cmd3(&quot;blender \&quot;&quot; + s + &quot;\&quot; --background --python \&quot;&quot; + e-&gt;dataPath + &quot;\\Python\\blend_exporter.py\&quot; -- \&quot;&quot; + s.substr(0, s.find_last_of('\\')) + &quot;?&quot; + ss.substr(ss.find_last_of('\\') + 1, string::npos) + &quot;\&quot;\n&quot;);
+//outputs object list, and meshes in subdir
+if (CreateProcess(&quot;C:\\Windows\\System32\\cmd.exe&quot;, 0, NULL, NULL, true, CREATE_NO_WINDOW, NULL, &quot;F:\\TestProject\\&quot;, &amp;startInfo, &amp;processInfo) != 0) {
+    cout &lt;&lt; &quot;executing Blender...&quot; &lt;&lt; endl;
+    DWORD dwWrite;
+    bSuccess = WriteFile(stdInW, cmd1.c_str(), cmd1.size(), &amp;dwWrite, NULL) != 0;
+    if (bSuccess &amp;&amp; dwWrite != 0) {
+        //...
+</code></pre>
+<p>I know. But this is what worked. So if you have a better solution to doing this please PM me, thanks.</p>
+<p>The next thing is to show the model in Engine. Woudn't be harder, right?
+Each Blender file is added to a list, and pressing <em>Shift-A</em> calls it up for addition to the scene. I really love Blender, that's why.</p>
+<p><img src="images/0206_addobject.png" alt="alt"></p>
+<p>Doing that creates an <code>Mesh</code> instance of the object, which is referenced by a <code>MeshFilter</code> component, which is in turn referenced by a <code>MeshRenderer</code> component responsible for rendering. The <code>MeshRenderer</code> will also automatically allocate <code>Material</code> slots for assigning to.</p>
+<p>Now each material hosts a shader, which may contain several variables for filling, Textures and so on. Thus, a special column, <em>VARSTART - VAREND</em> is allocated in the shader code for said variables, where variables with the same name in the vertex and fragment code would be filled in by the renderer. A typical shader would thus look like this:</p>
+<pre><code class="language-glsl">#include Commons
+
+VARSTART
+int range(0, 10) foo = 1;
+float range(0, 1) boo = 1;
+float koo=0;
+texture tex;
+VAREND
+
+VERTSTART
+void main(){
+    gl_Position = _P*_MV*vec4(pos.x, pos.y, pos.z, 1);
+    uv = texCoord;
+}
+VERTEND
+
+FRAGSTART
+uniform sampler2D tex;
+uniform int foo;
+uniform float boo;
+uniform float koo;
+
+void main()
+{
+    Output(texture(tex, uv + vec2(foo*(boo+koo), 0)).rgb, vec3(1, 0, 0), 1, 0, 0);
+}
+FRAGEND
+</code></pre>
+<p>*Markdown refused highlight my classes and enums. Please look at the source for clearer image.</p>
+<p>Also note that as glsl does not support <em>#import</em> macros, they had to be parsed manually. Though, and I <a href="https://www.opengl.org/discussion_boards/showthread.php/169209-include-in-glsl">quote</a>,</p>
+<blockquote>
+<p>I find it difficult to believe that anyone inclined to write OpenGL shader code would be incapable of writing similar functionality in less than 10 minutes.</p>
+</blockquote>
+<p>LUL.</p>
+<p>Anyway, Textures are imported and handled the same way as Blender files (the same for all assets in fact), and stored in void pointers (yes, yes, I know) like so.</p>
+<pre><code class="language-csharp">unordered_map&lt;ASSETTYPE, vector&lt;string&gt;&gt; normalAssets;
+unordered_map&lt;ASSETTYPE, vector&lt;void*&gt;&gt; normalAssetCaches;
+
+void DrawAssetSelector(float x, float y, float w, float h, Vec4 col, ASSETTYPE type, float labelSize, Font* labelFont, int* tar, callbackFunc func = nullptr, void* param = nullptr);
+ASSETID GetAssetInfo(string p, ASSETTYPE &amp;type, ASSETID&amp; i);
+ASSETID GetAssetId(void* p), GetAssetId(void* p, ASSETTYPE&amp; t);
+
+void ResetAssetMap();
+void ReloadAssets(string path, bool recursive);
+bool ParseAsset(string path);
+void* GetCache(ASSETTYPE type, int id);
+void* GenCache(ASSETTYPE type, int id);
+</code></pre>
+<p>Each material is then invoked for drawing on the Repaint stage like so.</p>
+<pre><code class="language-csharp">void DrawSceneObjectsOpaque(EB_Viewer* ebv, vector&lt;SceneObject*&gt; oo) {
+    for (SceneObject* sc : oo)
+    {
+        glPushMatrix();
+        Vec3 v = sc-&gt;transform.position;
+        //rotation matrix here
+        glTranslatef(v.x, v.y, v.z);
+        for (Component* com : sc-&gt;_components)
+        {
+            if (com-&gt;componentType == COMP_MRD || com-&gt;componentType == COMP_CAM)
+                com-&gt;DrawEditor(ebv);
+        }
+        DrawSceneObjectsOpaque(ebv, sc-&gt;children);
+        glPopMatrix();
+    }
+}
+</code></pre>
+<p>And in MeshRenderer.DrawEditor():</p>
+<pre><code class="language-csharp">MeshFilter* mf = (MeshFilter*)dependacyPointers[0];
+if (mf == nullptr || mf-&gt;mesh == nullptr || !mf-&gt;mesh-&gt;loaded)
+    return;
+glEnableClientState(GL_VERTEX_ARRAY);
+glPolygonMode(GL_FRONT_AND_BACK, (ebv-&gt;selectedShading == 0) ? GL_FILL : GL_LINE);
+glVertexPointer(3, GL_FLOAT, 0, &amp;(mf-&gt;mesh-&gt;vertices[0]));
+glLineWidth(1);
+for (uint m = 0; m &lt; mf-&gt;mesh-&gt;materialCount; m++) {
+    if (materials[m] == nullptr)
+        continue;
+    materials[m]-&gt;ApplyGL();
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, &amp;(mf-&gt;mesh-&gt;vertices[0]));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 0, &amp;(mf-&gt;mesh-&gt;uv0[0]));
+    glDrawElements(GL_TRIANGLES, mf-&gt;mesh-&gt;_matTriangles[m].size(), GL_UNSIGNED_INT, &amp;(mf-&gt;mesh-&gt;_matTriangles[m][0]));
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+}
+glUseProgram(0);
+glDisableClientState(GL_VERTEX_ARRAY);
+</code></pre>
+<p>Aaaaand in Material.ApplyGl():</p>
+<pre><code class="language-csharp">glUseProgram(shader-&gt;pointer);
+GLint mv = glGetUniformLocation(shader-&gt;pointer, &quot;_MV&quot;);
+GLint p = glGetUniformLocation(shader-&gt;pointer, &quot;_P&quot;);
+glUniformMatrix4fv(mv, 1, GL_FALSE, matrix);
+glUniformMatrix4fv(p, 1, GL_FALSE, matrix2);
+for (auto a : vals[SHADER_INT])
+    if (a.second != nullptr)
+        glUniform1i(a.first, *(int*)a.second);
+for (auto a : vals[SHADER_FLOAT])
+    if (a.second != nullptr)
+        glUniform1i(a.first, *(float*)a.second);
+for (auto a : vals[SHADER_VEC2]) {
+    if (a.second == nullptr)
+        continue;
+    Vec2* v2 = (Vec2*)a.second;
+    glUniform2i(a.first, v2-&gt;x, v2-&gt;y);
+}
+int ti = 0;
+for (auto a : vals[SHADER_SAMPLER]) {
+    if (a.second == nullptr)
+        continue;
+    MatVal_Tex* tx = (MatVal_Tex*)a.second;
+    if (tx-&gt;tex == nullptr)
+        continue;
+    glUniform1i(a.first, ti);
+    glActiveTexture(GL_TEXTURE0 + ti);
+    glBindTexture(GL_TEXTURE_2D, tx-&gt;tex-&gt;pointer);
+}
+</code></pre>
+<p>All of that for this image:</p>
+<p><img src="images/0206_texcube.png" alt="alt"></p>
+<p>Bye.</p>
+<p><a href="not.written.yet">next article</a></p>
+
+    <script src="https:/puakai.github.io/prism.js"></script>
+</body>
+</html>

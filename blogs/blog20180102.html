@@ -37,7 +37,6 @@ TRS = [mat.to_translation(), mat.to_quaternion(), mat.to_scale()]
         bn-&gt;tr-&gt;localPosition(loc);
         bn-&gt;tr-&gt;localRotation(*(Quat*)&amp;rot);
         bn-&gt;tr-&gt;localScale(scl);
-        MatFunc::FromTRS(bm.second-&gt;tr-&gt;_localPosition, bm.second-&gt;tr-&gt;_localRotation, bm.second-&gt;tr-&gt;_localScale);
     }
     i++;
 }

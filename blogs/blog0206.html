@@ -1,11 +1,11 @@
 <html>
 <head>
 	<h1>Engine Diaries #2</h1>
-	<link href="https:/puakai.github.io/prism.css" rel="stylesheet" />
+	<link href="https:/chokomancarr.github.io/prism.css" rel="stylesheet" />
 </head>
 <body>
 <p><a href="blog0121.html">previous article</a></p>
-<p><a href="https://github.com/puakai/OpenGl_Engine">Source on Github</a></p>
+<p><a href="https://github.com/chokomancarr/ChokoEngine">Source on Github</a></p>
 <p>There goes my second year. Sigh. Hope i didn't fail any subjects lol not funny</p>
 <h2>Importing models</h2>
 <p>First thing first, exporting a readable format from Blender. <em>obj?? fbx?? Why not use them??</em> Well, the same reason I am trying to write this engine this whole time. Gonna stop explaining that, ok?
@@ -75,7 +75,7 @@ def write (self, file, _str):
 <p>Note that the file path is passed as command line argument when invoking this script. Also, the file contents are incomplete. Just gonna add them as I go on.</p>
 <p>Now the invoking part is the hard part. Originally, I would just call CreateProcess with args and get done with it, but <em>I need it to print a debug log to, if possible, the engine output window</em>. So the obvious thing is to redirect stdio and do print() in Python, but <strong>Blender will crash when its stdio is redirected</strong>. Fk.</p>
 <p>Now for the dirty part. To read io and not kill Blender in the process, Blender is invoked separately by creating a command prompt, redirecting that window's stdio, and invoking Blender <em>manually</em> by command lines. Yeah.</p>
-<pre><code class="language-csharp">SECURITY_ATTRIBUTES sa;
+<pre><code class="language-cpp">SECURITY_ATTRIBUTES sa;
 sa.nLength = sizeof(SECURITY_ATTRIBUTES);
 sa.bInheritHandle = TRUE;
 sa.lpSecurityDescriptor = NULL;
@@ -169,7 +169,7 @@ FRAGEND
 </blockquote>
 <p>LUL.</p>
 <p>Anyway, Textures are imported and handled the same way as Blender files (the same for all assets in fact), and stored in void pointers (yes, yes, I know) like so.</p>
-<pre><code class="language-csharp">unordered_map&lt;ASSETTYPE, vector&lt;string&gt;&gt; normalAssets;
+<pre><code class="language-cpp">unordered_map&lt;ASSETTYPE, vector&lt;string&gt;&gt; normalAssets;
 unordered_map&lt;ASSETTYPE, vector&lt;void*&gt;&gt; normalAssetCaches;
 
 void DrawAssetSelector(float x, float y, float w, float h, Vec4 col, ASSETTYPE type, float labelSize, Font* labelFont, int* tar, callbackFunc func = nullptr, void* param = nullptr);
@@ -183,7 +183,7 @@ void* GetCache(ASSETTYPE type, int id);
 void* GenCache(ASSETTYPE type, int id);
 </code></pre>
 <p>Each material is then invoked for drawing on the Repaint stage like so.</p>
-<pre><code class="language-csharp">void DrawSceneObjectsOpaque(EB_Viewer* ebv, vector&lt;SceneObject*&gt; oo) {
+<pre><code class="language-cpp">void DrawSceneObjectsOpaque(EB_Viewer* ebv, vector&lt;SceneObject*&gt; oo) {
     for (SceneObject* sc : oo)
     {
         glPushMatrix();
@@ -201,7 +201,7 @@ void* GenCache(ASSETTYPE type, int id);
 }
 </code></pre>
 <p>And in MeshRenderer.DrawEditor():</p>
-<pre><code class="language-csharp">MeshFilter* mf = (MeshFilter*)dependacyPointers[0];
+<pre><code class="language-cpp">MeshFilter* mf = (MeshFilter*)dependacyPointers[0];
 if (mf == nullptr || mf-&gt;mesh == nullptr || !mf-&gt;mesh-&gt;loaded)
     return;
 glEnableClientState(GL_VERTEX_ARRAY);
@@ -224,7 +224,7 @@ glUseProgram(0);
 glDisableClientState(GL_VERTEX_ARRAY);
 </code></pre>
 <p>Aaaaand in Material.ApplyGl():</p>
-<pre><code class="language-csharp">glUseProgram(shader-&gt;pointer);
+<pre><code class="language-cpp">glUseProgram(shader-&gt;pointer);
 GLint mv = glGetUniformLocation(shader-&gt;pointer, &quot;_MV&quot;);
 GLint p = glGetUniformLocation(shader-&gt;pointer, &quot;_P&quot;);
 glUniformMatrix4fv(mv, 1, GL_FALSE, matrix);
@@ -258,6 +258,6 @@ for (auto a : vals[SHADER_SAMPLER]) {
 <p>Bye.</p>
 <p><a href="not.written.yet">next article</a></p>
 
-    <script src="https:/puakai.github.io/prism.js"></script>
+    <script src="https:/chokomancarr.github.io/prism.js"></script>
 </body>
 </html>

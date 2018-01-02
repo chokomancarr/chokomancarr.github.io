@@ -1,0 +1,57 @@
+<html>
+<head>
+	<title>Chokomancarr's Blog</title>
+</head>
+<body style="max-width: 1000px; margin: 0px auto; font-size: 14pt">
+<h1 style="margin: 20px 0">Exporting Armature Animation from Blender3D</h1>
+<p>Hello. While writing my game engine, I came across the need to write a .blend file exporter for 3d models. Now the mesh part is easy. Armature, so-so. The problem was with animations. This problem took me a good part of a whole week to resolve, <em>because the Blender API was such a bliss to read</em>, so I guess it would be a good idea to document it below.</p>
+<p>First, we are required to export <em>local matrices</em> for each bone. <a href="https://docs.blender.org/api/blender_python_api_2_77_1/bpy.types.PoseBone.html">The Blender API for posebone</a> provides a few matrix variables for each pose bone<sup class="footnote-ref"><a href="#fn1" id="fnref1">[1]</a></sup>, as listed below.</p>
+<ul>
+<li>matrix</li>
+<li>matrix_basis</li>
+<li>matrix_channels</li>
+</ul>
+<p>Of these 3, <em>matrix_basis</em> is a local matrix (relative to parent bone), while the others are 'object' matrices (relative to armature object). As we want local transforms, let's use <em>matrix_basis</em> for now (spoiler alert: It won't work).</p>
+<p>We can query the TRS (Translation, Rotation, Scale) of a bone by first applying the action (<em>conveniently</em> undocumented), setting the appropriate frame, and getting the TRS themselves, as shown below.</p>
+<pre style="background:#333; padding: 10px; border-radius:5px;"><code class="language-python" style="color:#fff;">arm.animation_data.action = action
+self.scene.frame_set(<span class="hljs-number">0</span>)
+mat = bone.matrix_basis
+TRS = [mat.to_translation(), mat.to_quaternion(), mat.to_scale()]
+</code></pre>
+<p>you might want to set the armature to pose mode before exporting, or else all animations will be in rest position (<em>I'm looking at you, Unity</em>).</p>
+<pre style="background:#333; padding: 10px; border-radius:5px;"><code class="language-python" style="color:#fff;">obj.data.pose_position = <span class="hljs-string">'POSE'</span>
+</code></pre>
+<p>Now the problem arises when constraints are used. For example, when an IK modifier is used, the driven bone's matrix_basis will <em>NOT</em> be changing throughout the animation (also, <em>conveniently</em>, not clearly documented<sup class="footnote-ref"><a href="#fn2" id="fnref2">[2]</a></sup>).</p>
+<p>We are thus forced to use <em>matrix</em>. Now <em>matrix</em> is an 'object' matrix, so some matrix math is required. First, let's look at this <em>beautifully-drawn</em> figure below.</p>
+<p><img src="images/20180102_armmatrix.png" alt="alt text"></p>
+<p>Therefore, if we want to get the local matrix of bone1, which is a child of bone2, by doing <strong>mat2 * mat1<sup>-1</sup></strong>, you get the object-spaced "local" matrix, that is, rotating from parent rotation to child rotation in object space. On the other hand, by doing <strong>mat1<sup>-1</sup> * mat2</strong>, you get the <em>real</em> local space, where the rotation is in the parent's space.</p>
+<p>So in the end, the exported file contains an array of TRS values, which then our C++ script reads and applies to bone transforms. On a side-note, unlike <em>matrix_basis</em>, resolving <em>matrix</em> gives the relative position from the parent's base, not the tip, so no consideration will be needed when applying to the game asset, where bones are just normal transforms.</p>
+<p>On another note, the TRS values have their respective curves and names, for example "bone1/bone2/bone3/[T/R/S]". These names will be used to identify the curves, so other armatures with identical bone names will be able to use them. Here's a snippet of applying a frame of animation. The full code can be found <a href="https://github.com/chokomancarr/ChokoEngine/blob/master/OpenGl1_Editor/src/SceneObjects.cpp#L1317">here</a>.</p>
+<pre style="background:#333; padding: 10px; border-radius:5px;"><code class="language-cpp" style="color:#fff;">uint i = <span class="hljs-number">0</span>;
+<span class="hljs-keyword">for</span> (<span class="hljs-keyword">auto</span>&amp; bn : _allbones) {
+    <span class="hljs-keyword">auto</span> id = _boneAnimIds[i];
+    <span class="hljs-keyword">if</span> (id != -<span class="hljs-number">1</span>) {
+        Vec4 loc = anm-&gt;Get(id);
+        Vec4 rot = anm-&gt;Get(id + <span class="hljs-number">1</span>);
+        Vec4 scl = anm-&gt;Get(id + <span class="hljs-number">2</span>);
+        bn-&gt;tr-&gt;localPosition(loc);
+        bn-&gt;tr-&gt;localRotation(*(Quat*)&amp;rot);
+        bn-&gt;tr-&gt;localScale(scl);
+        MatFunc::FromTRS(bm.second-&gt;tr-&gt;_localPosition, bm.second-&gt;tr-&gt;_localRotation, bm.second-&gt;tr-&gt;_localScale);
+    }
+    i++;
+}
+</code></pre>
+<p>Bye.</p>
+<p><a href="https://twitter.com/chokomancarr">Follow me on Twitter!</a></p>
+<hr class="footnotes-sep">
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><p>we must use armature_object.<em>pose</em>.bones instead of .<em>data</em>.bones when exporting animations, or else the animation data will not be reflected. <a href="#fnref1" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn2" class="footnote-item"><p>if you read from bottom to top, the term "before constraints" from <em>matrix_channel</em> can be reapplied. But yeah. <a href="#fnref2" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+</body>
+</html>

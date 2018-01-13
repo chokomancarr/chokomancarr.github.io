@@ -1,4 +1,4 @@
-#include "Network.hpp"
+#include "Network.h"
 
 Node::Node(Layer* p, bool usesig) : usesig(usesig) {
 	if (!p) return;

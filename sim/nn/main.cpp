@@ -3,7 +3,7 @@
 #include <time.h>
 #include <random>
 
-#include "Network.hpp"
+#include "Network.h"
 
 std::vector<std::pair<std::vector<double>, double>> dataset;
 uint datasetSz;
@@ -42,7 +42,6 @@ int main() {
 	while (1) {
 		for (uint a = 0; a < 500; a++) {
 			net->BP(datasetSz, dataset, 0.01f);
-			std::cout << net->layers[3]->nodes[0]->cost << std::endl;
 		}
 		std::cout << net->layers[3]->nodes[0]->cost << std::endl;
 	}

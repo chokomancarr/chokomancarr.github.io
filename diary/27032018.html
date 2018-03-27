@@ -1,0 +1,17 @@
+<h1>27/03/2018</h1>
+<p><em>今日をもって日報を始めました。個人の予測では１週間で飽きると思います。</em></p>
+<p><br></p>
+<p><code>std::string IO::path = IO::InitPath();</code>が動かなかった問題を解決。</p>
+<pre><code>std::string IO::InitPath() {
+   path = ....
+   return path;
+}
+</code></pre>
+<p>でさすがに<code>path = path</code>はおかしいと思ったけど<code>const std::string&amp;</code>を返してるわけではないし大丈夫やろと思ったのになぁ</p>
+<p>なので</p>
+<pre><code>   path2 = ....
+   path = path2;
+   return path2;
+</code></pre>
+<p>にしたら動いた。</p>
+<p>C++勉強し直さないと。</p>
